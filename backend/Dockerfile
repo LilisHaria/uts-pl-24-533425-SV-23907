@@ -10,7 +10,6 @@ COPY --from=composer:2.8 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Salin manifest Composer lebih dahulu agar cache dependency efektif
 COPY composer.json composer.lock ./
 RUN composer install \
     --no-dev \
@@ -19,15 +18,13 @@ RUN composer install \
     --no-progress \
     --no-scripts
 
-# Salin kode aplikasi setelah dependency terpasang
 COPY . .
+
+RUN rm -f bootstrap/cache/packages.php bootstrap/cache/services.php \
+    && php artisan package:discover
 
 RUN mkdir -p storage/framework/cache \
     storage/framework/sessions \
     storage/framework/views \
     bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
-
-EXPOSE 8000
-
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
