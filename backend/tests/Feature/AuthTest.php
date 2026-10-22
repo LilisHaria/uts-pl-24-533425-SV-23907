@@ -10,9 +10,15 @@ class AuthTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_user_can_register(): void
+    public function test_user_can_register_with_token(): void
     {
-        $response = $this->postJson('/api/register', [
+        $authenticatedUser = User::factory()->create();
+
+        $token = $authenticatedUser
+            ->createToken('test-token')
+            ->plainTextToken;
+
+        $response = $this->withToken($token)->postJson('/api/register', [
             'name' => 'Mahasiswa',
             'email' => 'register@example.com',
             'password' => 'password123',
@@ -34,7 +40,7 @@ class AuthTest extends TestCase
 
     public function test_user_can_login(): void
     {
-        $user = User::factory()->create([
+        User::factory()->create([
             'email' => 'login@example.com',
             'password' => 'password123',
         ]);
@@ -51,5 +57,46 @@ class AuthTest extends TestCase
                 'user' => ['id', 'email'],
                 'token',
             ]);
+    }
+
+    public function test_books_require_authentication(): void
+    {
+        $this->getJson('/api/books')->assertUnauthorized();
+    }
+
+    public function test_register_requires_authentication(): void
+    {
+        $this->postJson('/api/register', [
+            'name' => 'Mahasiswa',
+            'email' => 'register-no-token@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])->assertUnauthorized();
+    }
+    public function test_login_with_wrong_password_returns_401(): void
+    {
+        User::factory()->create([
+            'email' => 'wrong-password@example.com',
+            'password' => 'password123',
+        ]);
+
+        $this->postJson('/api/login', [
+            'email' => 'wrong-password@example.com',
+            'password' => 'wrong-password',
+        ])->assertUnauthorized();
+    }
+
+    public function test_register_validation_failure_returns_422(): void
+    {
+        $user = User::factory()->create();
+
+        $token = $user->createToken('test-token')->plainTextToken;
+
+        $this->withToken($token)->postJson('/api/register', [
+            'name' => '',
+            'email' => 'not-an-email',
+            'password' => '123',
+            'password_confirmation' => 'different',
+        ])->assertUnprocessable();
     }
 }
